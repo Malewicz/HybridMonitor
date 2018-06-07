@@ -54,7 +54,7 @@ class TC08USB(object):
         self._temp = np.zeros( (9,), dtype=np.float32)
         self._overflow_flags = np.zeros( (1,), dtype=np.int16)
         
-        self._units = self.TC_UNITS['FAHRENHEIT']
+        self._units = self.TC_UNITS['CENTIGRADE']
         
     def open_unit(self):
         self._handle = self._dll.usb_tc08_open_unit()
@@ -92,9 +92,9 @@ class TC08USB(object):
         Initializes the TC-08 unit as desired
         Returns 0 if there are no errors, returns error code otherwise
         Arguments:
+            channels -- array of ints indicating channels to be opened (1-8)
             mains -- frequency for mains rejection, 50 of 60 Hz
             tc_type -- char indicating the thermocouple type being used
-            channels -- array of ints indicating channels to be opened (1-8)
         '''
         
         if self.open_unit() < 1:

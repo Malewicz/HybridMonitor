@@ -8,23 +8,23 @@ Origin data server.
 """
 
 '''
-TO DO before trying this out:
-    1. Implement and import the picos class
-    2. Implement and import the magSensor class
-    3. determine failure conditions throughout and add corresponding ifs/trys
-    4. implement hang() function in channel class
+TO DO:
+    [x] 1. Implement and import the picos class
+    [ ] 2. Implement and import the magSensor class
+    [ ] 3. determine failure conditions throughout and add corresponding ifs/trys
+    [x] 4. implement hang() function in channel class
 '''
 
 #!/usr/bin/env python
 import os
-import random
 import time
-import zmq
-import json
 import numpy as np
-import requests
 import sys
 import PicosMonitor
+import PickoffMonitor
+import signal
+
+
 
 class channel(object):
     """
@@ -44,20 +44,22 @@ class channel(object):
         self.name = "Hybrid_" + name
         self.dataType = dataType
         self.serv = server
-        self.connection = self.connect()
         self.records = {}
         self.dataNames = dataNames
         for dataName in dataNames:
             self.records.update({dataName:dataType})
+        self.connection = self.connect()
         self.data = {}
         
     def connect(self) :
         """
         lets the server know we going to be sending this type of data
         """
+        print self.records
         chan = self.serv.registerStream(
                 stream = self.name, 
-                records = self.records)
+                records = self.records,
+                timeout = 30*1000)
         return chan
     def measure(self) :
         """
@@ -72,9 +74,8 @@ class channel(object):
     def hang(self):
         """
         Closes connection with the server. Returns status/error
-        INCOMPLETE
         """
-        return 0
+        self.connection.close()
         
 class tempChannel(channel):
     """
@@ -86,7 +87,7 @@ class tempChannel(channel):
             picos -- object representing connection to picos TC-08 temperature
                 monitor
         """
-        super(tempChannel,self).__init__(self, name, dataType,server)
+        super(tempChannel,self).__init__(name, dataType,server,dataNames)
         self.picos = picos
     def measure(self) :
         """
@@ -100,6 +101,19 @@ class tempChannel(channel):
                 ))
         return self.data
 
+class I2VChannel(channel):
+    """
+    Class to deal with analog inputs from the NIDAQmx monitors
+    """
+    def __init__(self,name,dataType,server,dataNames,I2Vmonitor):
+        super(I2VChannel,self).__init__(name,dataType,server,dataNames)
+        self.I2Vmonitor = I2Vmonitor
+    def measure(self):
+        """
+        Calls the NIDAQ's measurement class, which should return an array of powers organized by the channel mapping
+        """
+        self.data = self.I2Vmonitor.get_powers()
+        return self.data
     
 class magChannel(channel):
     """
@@ -111,7 +125,7 @@ class magChannel(channel):
             magSensor -- represents connection to magnetic field sensor (Not 
             yet installed)
         """
-        super(tempChannel,self).__init__(self, name, dataType,server)
+        super(tempChannel,self).__init__(name, dataType,server,dataNames)
         self.magSensor = magSensor
     def measure(self):
         """
@@ -123,54 +137,107 @@ class magChannel(channel):
                 self.magSensor.getField()
                 ))
         return self.data
-    
-def main () :
-    #we must first find ourselves
-    fullBinPath  = os.path.abspath(os.getcwd() + "/" + sys.argv[0])
-    fullBasePath = os.path.dirname(os.path.dirname(fullBinPath))
-    fullLibPath  = os.path.join(fullBasePath, "lib")
-    fullCfgPath  = os.path.join(fullBasePath, "config")
-    sys.path.append(fullLibPath)
-    
-    from origin.client import server
-    from origin import current_time, TIMESTAMP
-    
-    #initialize the picos 
-    tempChannels = {"Chamber" : 1,"Coils" : 2}
-    picosDLLPath = "C:\Program Files\Pico Technology\SDK\lib"
-    picos = PicosMonitor.TC08USB(dll_path = picosDLLPath)
-    picos.start_unit(tempChannels.values())
-    
-    if len(sys.argv) > 1:
-      if sys.argv[1] == 'test':
+
+
+def closeAll (channels):
+    """
+    closes all the channels in the argument.
+    Arguments:
+        channels -- array of channels
+    """
+    for channel in channels:
+        print "closing channel : " + channel.name
+        channel.hang()
+        
+measurementPeriod = 30 #s
+
+t0 = time.clock()
+#we must first find ourselves
+print 'finding ourselves'
+fullBinPath  = os.path.abspath(os.getcwd() + "/" + sys.argv[0])
+fullBasePath = os.path.dirname(os.path.dirname(fullBinPath))
+fullLibPath  = os.path.join(fullBasePath, "lib")
+fullCfgPath  = os.path.join(fullBasePath, "config")
+sys.path.append(fullLibPath)
+
+print 'getting origin'
+from origin.client import server
+from origin import current_time, TIMESTAMP
+
+print 'initializing picos'
+#initialize the picos 
+tempChannels = {"Chamber" : 1,"Coils" : 2}
+picosDLLPath = "C:\Program Files\Pico Technology\SDK\lib"
+picos = PicosMonitor.TC08USB(dll_path = picosDLLPath)
+print repr(picos.TC_ERRORS[picos.start_unit(tempChannels.values())])
+
+print 'initializing pickoff monitor'
+#initialize the pickoff monitor
+I2VChannels = {"X1" : 'ai4',
+               "X2" : 'ai2',
+               "Y1" : 'ai0',
+               "Y2" : 'ai1',
+               "Z1" : 'ai3',
+               "Z2" : 'ai5'}
+I2V = PickoffMonitor.NIDAQmxAI(I2VChannels)
+
+
+print 'grabbing config file'
+if len(sys.argv) > 1:
+    if sys.argv[1] == 'test':
         configfile = os.path.join(fullCfgPath, "origin-server-test.cfg")
-      else:
-        configfile = os.path.join(fullCfgPath, sys.argv[1])
     else:
-      configfile = os.path.join(fullCfgPath, "origin-server.cfg")
-    
-    import ConfigParser
-    config = ConfigParser.ConfigParser()
-    config.read(configfile)
-    
-    # something that represents the connection to the server
-    serv = server(config)
-    #open the channels
-    channels = []
-    channels.append(tempChannel("Temp","float",serv,tempChannels.keys(),picos))
+        configfile = os.path.join(fullCfgPath, sys.argv[1])
+else:
+    configfile = os.path.join(fullCfgPath, "origin-server.cfg")
+
+import ConfigParser
+config = ConfigParser.ConfigParser()
+config.read(configfile)
+
+# something that represents the connection to the server
+print 'grabbing server'
+serv = server(config)
+print 'opening channels'
+#open the channels
+channels = []
+channels.append(tempChannel("Temp","float",serv,tempChannels.keys(),picos))
+channels.append(I2VChannel("Beam_Balances","float",serv,I2VChannels.keys(),I2V))
 #    channels.append(magChannel("B","float",serv,["X,Y,Z"]))
-    
-    
-    # This might need to be more complicated, but you get the gist. Keep sending records forever
-    time.sleep(5)
-    
-    while True:
+
+
+# This might need to be more complicated, but you get the gist. Keep sending records forever
+time.sleep(10)
+
+print 'begin communication'
+err = 0
+#TODO : Make timinig consistent despite wait blocks in monitor classes
+#TODO : Write data to channels in multiple threads once the number of channels gets large
+while True:
+    try:
+        #t1 = time.clock()
         for channel in channels :
             print "sending " + channel.name
-            channel.measure()
+            print "Measured :" + repr(channel.measure())
             ts = current_time(config)
-            data = channel.data.update({TIMESTAMP:ts})
-            channel.connection.send(data)
+            data = channel.data
+            data.update({TIMESTAMP:ts})
+            try:
+                channel.connection.send(**channel.data)
+            except:
+                closeAll(channels)
+                err = 1
+                break
             print(data)
-            time.sleep(1)
-            #if there's an error break out of both loops and close the connections
+            #interrupt this with a keystroke and hang connection
+        if err == 1 :
+            break
+        time.sleep(measurementPeriod)
+        #FOR TIMING: 
+        #t2 = time.clock()
+        #deltaT = t2 - t1
+        #time.sleep(measurementPeriod - deltaT)
+        
+    except KeyboardInterrupt :
+        closeAll(channels)
+        break
