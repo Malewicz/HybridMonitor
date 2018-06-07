@@ -9,10 +9,12 @@ Origin data server.
 
 '''
 TO DO:
-    [x] 1. Implement and import the picos class
+    [ ] 1. Implement a GUI in pyqt5
     [ ] 2. Implement and import the magSensor class
-    [ ] 3. determine failure conditions throughout and add corresponding ifs/trys
-    [x] 4. implement hang() function in channel class
+    [ ] 3. Determine failure conditions throughout and add corresponding ifs/trys
+    [ ] 4. Fix PickoffMonitor.py to work in general for the NI DAQmx with any given set of inputs
+    [ ] 5. Make separate file setup for channel classes
+    [ ] 6. Make Device Monitor classes work with config files
 '''
 
 #!/usr/bin/env python
