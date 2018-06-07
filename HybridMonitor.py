@@ -114,7 +114,13 @@ class I2VChannel(channel):
         """
         self.data = self.I2Vmonitor.get_powers()
         return self.data
-    
+    def hang(self) :
+        """
+        Closes the connection with the server. Returns status/error and closes open tasks in DAQmx
+        """
+        self.I2Vmonitor.close_task()
+        self.connection.close()
+        
 class magChannel(channel):
     """
     Class to deal with the magnetic field monitor near the science chamber
@@ -155,9 +161,11 @@ t0 = time.clock()
 #we must first find ourselves
 print 'finding ourselves'
 fullBinPath  = os.path.abspath(os.getcwd() + "/" + sys.argv[0])
-fullBasePath = os.path.dirname(os.path.dirname(fullBinPath))
-fullLibPath  = os.path.join(fullBasePath, "lib")
-fullCfgPath  = os.path.join(fullBasePath, "config")
+print fullBinPath
+fullBasePath = os.path.dirname(fullBinPath)
+print fullBasePath
+fullLibPath  = os.path.join(fullBasePath, "origin\\lib")
+fullCfgPath  = os.path.join(fullBasePath, "origin\\config")
 sys.path.append(fullLibPath)
 
 print 'getting origin'
@@ -193,6 +201,7 @@ else:
 
 import ConfigParser
 config = ConfigParser.ConfigParser()
+print configfile
 config.read(configfile)
 
 # something that represents the connection to the server
@@ -240,4 +249,5 @@ while True:
         
     except KeyboardInterrupt :
         closeAll(channels)
+        raise KeyboardInterrupt
         break
