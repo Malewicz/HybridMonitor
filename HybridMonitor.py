@@ -176,7 +176,7 @@ from origin import current_time, TIMESTAMP
 
 print 'initializing picos'
 #initialize the picos 
-tempChannels = {"Chamber" : 1,"Coils" : 2}
+tempChannels = {"Chamber" : 1,"Coils" : 2,"Near_Terminal" : 3}
 picosDLLPath = "C:\Program Files\Pico Technology\SDK\lib"
 picos = PicosMonitor.TC08USB(dll_path = picosDLLPath)
 print repr(picos.TC_ERRORS[picos.start_unit(tempChannels.values())])
