@@ -97,6 +97,8 @@ class TC08USB(object):
             tc_type -- char indicating the thermocouple type being used
         '''
         
+        self.chanList = channels
+        
         if self.open_unit() < 1:
             i = 0
             #a unit can remain open and have an active handle which is not self.handle
@@ -108,21 +110,27 @@ class TC08USB(object):
                     return self.print_error('No units detected :')
                 if self.close_other_unit(i) == 1 :
                     self.open_unit()
-            if self.handle < 0 :
+            if self._handle < 0 :
                 return self.printError('Error opeining unit : ')
                 
         if self.set_mains(mains) == 0 :
             return self.printError('Error setting mains rejection : ')
         
-        for channel in channels :
+        for channel in channels.values() :
             if self.set_channel(channel,tc_type) < 1 :
                 return self.printError('Error setting channel ' + str(channel) + ' : ')
             
         return 0
     def get_temp(self):
+        """
+        Queries the Picos USB TC08 to measure the temperatures then generates a
+        dictionary of temperature stream names to their value
+        Returns:
+            -data: a dictionary with keys indicating what temperature is being measured
+                and values with the temperature in Centigrade. Types : {String : np.float_32}
+        """
         self.get_single()
-        data = []
-        for measurement in self._temp:
-            if measurement.item() > 0:
-                data.append(measurement)
-        return data[1:]
+        data = {}
+        for key,value in self.chanList.iteritems():
+            data.update({key:self._temp[value]})
+        return data

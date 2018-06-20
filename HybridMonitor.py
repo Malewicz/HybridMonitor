@@ -97,10 +97,7 @@ class tempChannel(channel):
         saves them to data as a dictionary mapped to datanames (make sure you
         get the order right)
         """
-        self.data = dict(zip(
-                self.dataNames,
-                self.picos.get_temp()
-                ))
+        self.data = self.picos.get_temp()
         return self.data
 
 class I2VChannel(channel):
@@ -179,7 +176,7 @@ print 'initializing picos'
 tempChannels = {"Chamber" : 1,"Coils" : 2,"Near_Terminal" : 3}
 picosDLLPath = "C:\Program Files\Pico Technology\SDK\lib"
 picos = PicosMonitor.TC08USB(dll_path = picosDLLPath)
-print repr(picos.TC_ERRORS[picos.start_unit(tempChannels.values())])
+print repr(picos.TC_ERRORS[picos.start_unit(tempChannels)])
 
 print 'initializing pickoff monitor'
 #initialize the pickoff monitor
