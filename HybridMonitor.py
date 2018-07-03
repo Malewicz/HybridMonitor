@@ -154,7 +154,7 @@ def closeAll (channels):
         print "closing channel : " + channel.name
         channel.hang()
         
-measurementPeriod = 30 #s
+measurementPeriod = 10 #s
 
 t0 = time.clock()
 #we must first find ourselves

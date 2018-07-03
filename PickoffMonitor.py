@@ -41,10 +41,10 @@ class NIDAQmxAI():
     applyFormula = False
 
     def __init__(self,channelMap):
-        self.DeviceName = "Dev1"
+        self.DeviceName = "PXI2Slot6"
         self.samples_per_measurement = 2
         self.sample_rate = 1000
-        self.triggerSource = '/Dev1/PFI0'
+        self.triggerSource = '/PXI2Slot6/PFI0'
         self.triggerEdge = 'Rising'
         self.formula = [lambda v : 1.016*v-.0021,
                         lambda v : 0.935*v+.0172,
